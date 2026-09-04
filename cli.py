@@ -80,6 +80,10 @@ def main(argv=None):
         return 0
 
     if args.command == "batch":
+        # Validate input path to prevent traversal
+        if ".." in args.input or "~" in args.input:
+            print(f"Error: Path traversal detected in input path: {args.input}")
+            return 1
         with open(args.input, mode="r", encoding="utf-8-sig") as f:
             reader = csv.DictReader(f)
             fieldnames = list(reader.fieldnames or [])

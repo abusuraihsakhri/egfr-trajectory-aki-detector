@@ -6,9 +6,19 @@ Stdlib only.
 """
 import argparse, csv, sys, math
 
+
+def _safe_float(value, default=0.0):
+    """Safely convert a value to float, returning default on failure."""
+    if value is None:
+        return default
+    try:
+        return float(value)
+    except (ValueError, TypeError):
+        return default
+
+
 def calculate_score(**kwargs):
     """Generic formula stub: weighted sum of numeric inputs."""
-    import math
     vals = [float(v) for v in kwargs.values() if isinstance(v,(int,float)) or (isinstance(v,str) and v.replace('.','',1).isdigit())]
     if not vals:
         vals = [float(kwargs.get("value", 1))]
@@ -16,6 +26,154 @@ def calculate_score(**kwargs):
     h = sum(ord(c) for c in "egfr-trajectory-aki-detector") % 10
     score = sum(vals) * (0.9 + h*0.02) + math.log1p(len(vals))
     return {"score": round(score,2), "inputs": len(vals)}
+
+
+def calculate_meld_na(bilirubin, creatinine, inr, sodium, dialysis=False, albumin=None, sex="M"):
+    """
+    Calculate MELD-Na score for liver disease severity.
+    MELD = 3.78*ln(serum bilirubin) + 11.2*ln(INR) + 9.57*serum creatinine + 6.43
+    MELD-Na = MELD + 1.32*(137-Na) - [0.033*MELD*(137-Na)]
+    """
+    bili = _safe_float(bilirubin, 1.0)
+    creat = _safe_float(creatinine, 1.0)
+    inr_val = _safe_float(inr, 1.0)
+    na = _safe_float(sodium, 137.0)
+
+    # Apply bounds per UNOS guidelines
+    bili = max(1.0, bili)
+    creat = max(1.0, creat)
+    if dialysis:
+        creat = max(4.0, creat)
+    inr_val = max(1.0, inr_val)
+    na = max(125.0, min(137.0, na))
+
+    meld = (3.78 * math.log(bili) + 11.2 * math.log(inr_val) +
+            9.57 * math.log(creat) + 6.43)
+    meld_na = meld + 1.32 * (137 - na) - (0.033 * meld * (137 - na))
+    meld_na = max(6.0, min(40.0, round(meld_na, 1)))
+
+    return {"meld_na": meld_na, "meld_base": round(meld, 1), "stage": "HIGH" if meld_na >= 30 else "MODERATE" if meld_na >= 20 else "LOW"}
+
+
+def calculate_qtc(qt_ms, rr_ms=None, hr_bpm=None):
+    """
+    Calculate QTc (corrected QT interval) using Bazett's formula.
+    QTc = QT / sqrt(RR interval in seconds)
+    RR can be derived from heart rate: RR = 60 / HR
+    """
+    qt = _safe_float(qt_ms, 0.0)
+    if rr_ms is not None:
+        rr = _safe_float(rr_ms, 0.0) / 1000.0
+    elif hr_bpm is not None:
+        hr = _safe_float(hr_bpm, 60.0)
+        rr = 60.0 / max(hr, 1.0)
+    else:
+        rr = 1.0  # default 1 second
+
+    if rr <= 0 or qt <= 0:
+        return {"qtc_ms": 0.0, "qt_ms": qt, "rr_s": rr, "error": "Invalid QT or RR values"}
+
+    qtc = qt / math.sqrt(rr)
+    return {
+        "qtc_ms": round(qtc, 1),
+        "qt_ms": qt,
+        "rr_s": round(rr, 3),
+        "prolonged": qtc > 470  # >470ms considered prolonged (adult female threshold)
+    }
+
+
+def calculate_bmi_z(weight_kg, height_cm, age_months=60, sex="M"):
+    """
+    Calculate BMI and approximate z-score for pediatric populations.
+    Uses simplified CDC reference (not full LMS tables).
+    """
+    wt = _safe_float(weight_kg, 0.0)
+    ht_cm = _safe_float(height_cm, 0.0)
+    age_mo = _safe_float(age_months, 60.0)
+
+    if ht_cm <= 0 or wt <= 0:
+        return {"bmi": 0.0, "z_score": 0.0, "error": "Invalid weight or height"}
+
+    ht_m = ht_cm / 100.0
+    bmi = wt / (ht_m ** 2)
+
+    # Simplified z-score approximation using CDC median values
+    # This is a rough estimate; clinical use requires full LMS tables
+    if sex.upper() == "F":
+        median_bmi = 16.0 + 0.08 * min(age_mo, 240)  # rough female median
+    else:
+        median_bmi = 15.5 + 0.07 * min(age_mo, 240)  # rough male median
+
+    sd_bmi = median_bmi * 0.12  # approximate SD
+    z_score = (bmi - median_bmi) / max(sd_bmi, 0.1)
+
+    return {
+        "bmi": round(bmi, 2),
+        "z_score": round(z_score, 2),
+        "age_months": age_mo,
+        "sex": sex.upper(),
+        "category": "OBESE" if z_score > 2 else "OVERWEIGHT" if z_score > 1 else "NORMAL" if z_score > -2 else "UNDERWEIGHT"
+    }
+
+
+def convert_hba1c(hba1c_percent=None, eag_mgdl=None):
+    """
+    Convert between HbA1c (%) and Estimated Average Glucose (mg/dL).
+    eAG (mg/dL) = 28.7 * HbA1c - 46.7 (ADA formula)
+    """
+    if hba1c_percent is not None:
+        hba1c = _safe_float(hba1c_percent, 0.0)
+        eag = 28.7 * hba1c - 46.7
+        return {
+            "hba1c_percent": round(hba1c, 1),
+            "eag_mgdl": round(max(0, eag), 1),
+            "eag_mmol_l": round(max(0, eag) / 18.0, 1),
+            "category": "DIABETIC" if hba1c >= 6.5 else "PREDIABETIC" if hba1c >= 5.7 else "NORMAL"
+        }
+    elif eag_mgdl is not None:
+        eag = _safe_float(eag_mgdl, 0.0)
+        hba1c = (eag + 46.7) / 28.7
+        return {
+            "hba1c_percent": round(max(0, hba1c), 1),
+            "eag_mgdl": round(eag, 1),
+            "eag_mmol_l": round(eag / 18.0, 1),
+            "category": "DIABETIC" if hba1c >= 6.5 else "PREDIABETIC" if hba1c >= 5.7 else "NORMAL"
+        }
+    return {"error": "Provide either hba1c_percent or eag_mgdl"}
+
+
+def calculate_apri_fib4(ast_u_l, alt_u_l=None, platelets_109=None, age_years=None):
+    """
+    Calculate APRI and FIB-4 scores for liver fibrosis assessment.
+    APRI = (AST / ULN) / Platelets * 100
+    FIB-4 = (Age * AST) / (Platelets * sqrt(ALT))
+    """
+    ast = _safe_float(ast_u_l, 0.0)
+    alt = _safe_float(alt_u_l, 1.0)
+    platelets = _safe_float(platelets_109, 200.0)
+    age = _safe_float(age_years, 40.0)
+
+    # Assume ULN for AST is 40 U/L
+    ast_uln = 40.0
+
+    if platelets <= 0:
+        platelets = 1.0  # avoid division by zero
+
+    apri = (ast / ast_uln) / platelets * 100
+
+    result = {
+        "apri": round(apri, 3),
+        "ast_u_l": ast,
+        "apri_stage": "SIGNIFICANT_FIBROSIS" if apri > 1.0 else "POSSIBLE_FIBROSIS" if apri > 0.5 else "MINIMAL_FIBROSIS"
+    }
+
+    if alt_u_l is not None and platelets_109 is not None and age_years is not None:
+        alt = max(alt, 1.0)  # avoid sqrt(0)
+        fib4 = (age * ast) / (platelets * math.sqrt(alt))
+        result["fib4"] = round(fib4, 2)
+        result["fib4_stage"] = "ADVANCED_FIBROSIS" if fib4 > 3.25 else "INDETERMINATE" if fib4 > 1.45 else "MINIMAL_FIBROSIS"
+
+    return result
 
 
 def assess_row(row):
@@ -35,10 +193,30 @@ def assess_row(row):
     except Exception as e:
         return {"error": str(e)}
 
+def _validate_path(filepath, must_exist=False):
+    """Validate a file path to prevent path traversal attacks."""
+    import os
+    # Reject paths with traversal sequences
+    if ".." in filepath or "~" in filepath:
+        raise ValueError(f"Path traversal detected in: {filepath}")
+    # Normalize and ensure it's an absolute or safe relative path
+    normalized = os.path.normpath(filepath)
+    if normalized.startswith(".."):
+        raise ValueError(f"Path escapes working directory: {filepath}")
+    if must_exist and not os.path.isfile(normalized):
+        raise FileNotFoundError(f"Input file not found: {filepath}")
+    return normalized
+
+
 def process_csv(inp, out):
-    import csv
+    import csv, os
+    # Validate paths to prevent traversal
+    inp = _validate_path(inp, must_exist=True)
+    out = _validate_path(out, must_exist=False)
     with open(inp, newline="", encoding="utf-8-sig") as f:
         r = csv.DictReader(f); rows=list(r); fieldnames=r.fieldnames
+    if not fieldnames:
+        raise ValueError("CSV file is empty or has no headers")
     results=[]
     for row in rows:
         res = assess_row(row)
