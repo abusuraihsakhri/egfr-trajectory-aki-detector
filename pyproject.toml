@@ -21,7 +21,7 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
-    "Topic :: Scientific/Engineering :: Medical Science Apps.",
+    "Topic :: Scientific/Engineering :: Medical Science Apps",
 ]
 
 dependencies = [
@@ -37,6 +37,9 @@ dev = [
 
 [project.scripts]
 egfr-trajectory = "cli:main"
+
+[tool.setuptools]
+py-modules = ["cli", "egfr_trajectory", "renal_trajectory", "enrichment", "simulator"]
 
 [tool.setuptools.packages.find]
 include = ["agents*"]
