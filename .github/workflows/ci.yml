@@ -26,6 +26,11 @@ jobs:
         python -m pip install --upgrade pip
         pip install -e '.[dev]'
 
+    - name: Audit resolved Python dependencies
+      run: |
+        python -m pip install pip-audit
+        pip-audit -r requirements.txt
+
     - name: Compile Python and validate browser JavaScript
       run: |
         python -m compileall -q agents cli.py egfr_trajectory.py renal_trajectory.py
