@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Local eGFR trajectory and KDIGO 2012 acute kidney injury screening from dated, de-identified observations.">
+<title>eGFR Trajectory &amp; AKI Detector</title>
+<style>
+:root{color-scheme:light;--ink:#1a2c3c;--mute:#516477;--blue:#145b87;--line:#d5e1eb;--bg:#f5f8fc}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}
+main{max-width:1120px;margin:auto;padding:28px 18px 56px}header{margin-bottom:22px}
+h1{font-size:clamp(1.6rem,3.4vw,2.2rem);letter-spacing:-.03em;margin:0}
+h2{font-size:1.08rem;margin:0 0 14px}h3{font-size:.95rem;margin:20px 0 8px}p{color:var(--mute);margin:10px 0}
+.intro{max-width:780px}.grid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(310px,1fr);gap:18px}
+.panel{background:#fff;border:1px solid var(--line);border-radius:12px;padding:22px;box-shadow:0 3px 12px #142d4510}
+label{display:block;font-weight:600;margin:14px 0 5px}
+textarea,input[type=file],input[type=number]{width:100%;font:inherit;border:1px solid #adbece;border-radius:7px;padding:10px;background:#fff;color:var(--ink)}
+textarea{height:205px;resize:vertical;white-space:pre;overflow:auto;font:13px/1.5 ui-monospace,Consolas,monospace}
+textarea:focus-visible,input:focus-visible,button:focus-visible,a:focus-visible{outline:3px solid #81bee8;outline-offset:2px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:15px}.twocol{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+button{padding:10px 15px;border-radius:7px;cursor:pointer;border:1px solid var(--blue);background:var(--blue);color:#fff;font:600 14px system-ui}
+button.secondary{background:#fff;color:var(--blue)}button:disabled{opacity:.45;cursor:not-allowed}
+.check{display:flex;gap:8px;align-items:center;font-weight:500}.check input{width:18px;height:18px}
+.note{font-size:13px}.error{color:#a72b2b;font-weight:600;white-space:pre-wrap}
+.outcome{background:#eef5fb;border-radius:8px;padding:11px 13px;font-weight:700;margin-bottom:12px}
+.metrics{display:grid;grid-template-columns:1fr 1fr;gap:10px}.metric{padding:11px;background:#f7fafc;border:1px solid var(--line);border-radius:8px}
+.metric small{display:block;color:var(--mute)}.metric strong{font-size:18px}
+svg{display:block;width:100%;height:175px;border-radius:8px;background:#fafcff;border:1px solid var(--line)}
+ul{padding-left:20px;color:var(--mute)}li{margin:6px 0}
+footer{margin-top:24px;padding-top:16px;border-top:1px solid var(--line);font-size:13px}a{color:var(--blue)}
+@media(max-width:800px){.grid{grid-template-columns:1fr}.panel{padding:16px}.twocol{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<main>
+<header>
+<h1>eGFR Trajectory &amp; AKI Detector</h1>
+<p class="intro">Review dated serum creatinine measurements against KDIGO 2012 AKI thresholds, urine-output criteria, and descriptive longitudinal eGFR slope. Runs entirely in the browser.</p>
+<p class="note"><strong>Research and education only. Not validated for clinical decision-making.</strong> Use de-identified data without personal identifiers.</p>
+</header>
+<div class="grid">
+<section class="panel" aria-labelledby="inputs">
+<h2 id="inputs">Observations</h2>
+<label for="csv">Creatinine (mg/dL) and eGFR (mL/min/1.73 m²), CSV</label>
+<textarea id="csv" spellcheck="false" aria-describedby="csvHelp">timestamp,creatinine_mg_dl,egfr_ml_min_1_73m2
+2026-01-01T08:00:00Z,1.0,82
+2026-01-02T08:00:00Z,1.2,70
+2026-01-03T08:00:00Z,1.5,55</textarea>
+<p id="csvHelp" class="note">Use ISO 8601 timestamps. Header: <code>timestamp,creatinine_mg_dl,egfr_ml_min_1_73m2</code>. Either measurement column may be blank.</p>
+<label for="upload">Or import a CSV file (maximum 2 MB)</label>
+<input id="upload" type="file" accept=".csv,text/csv">
+<div class="twocol">
+<div><label for="rate">Urine output (mL/kg/h)</label><input id="rate" type="number" min="0" step="any" placeholder="Optional"></div>
+<div><label for="duration">Sustained duration (hours)</label><input id="duration" type="number" min="0" step="any" placeholder="Optional"></div>
+</div>
+<label class="check" for="rrt"><input id="rrt" type="checkbox"> Kidney replacement therapy initiated</label>
+<div class="row">
+<button id="analyze" type="button">Analyze</button>
+<button id="example" class="secondary" type="button">Longitudinal example</button>
+<button id="export" class="secondary" type="button" disabled>Export JSON</button>
+</div>
+<p id="error" class="error" role="alert"></p>
+</section>
+<section class="panel" aria-labelledby="analysis">
+<h2 id="analysis">Results</h2>
+<div id="results" aria-live="polite"><p>Select Analyze to process the supplied data.</p></div>
+<h3>eGFR observations</h3>
+<svg id="chart" viewBox="0 0 440 175" role="img" aria-label="eGFR observations over time"></svg>
+<h3>Interpretation limits</h3>
+<ul id="warnings"></ul>
+</section>
+</div>
+<footer>
+<p>Missing comparator values cannot exclude AKI. A urine-output rate is treated as continuously sustained over the stated duration. eGFR slope during non-steady-state AKI is not evidence of chronic kidney disease progression.</p>
+<p>Based on <a href="https://kdigo.org/guidelines/acute-kidney-injury/" target="_blank" rel="noopener noreferrer">KDIGO 2012 AKI criteria</a>. No data is transmitted or persisted by this web application. <a href="https://github.com/abusuraihsakhri/egfr-trajectory-aki-detector" rel="noopener noreferrer">Source and local Python API</a>.</p>
+</footer>
+</main>
+<script src="./app.js"></script>
+<script src="./ui.js"></script>
+</body>
+</html>
