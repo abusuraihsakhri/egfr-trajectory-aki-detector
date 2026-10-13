@@ -1,0 +1,7 @@
+{
+  "observations": [
+    {"timestamp": "2026-01-01T08:00:00Z", "creatinine_mg_dl": 1.0, "egfr_ml_min_1_73m2": 82},
+    {"timestamp": "2026-01-02T08:00:00Z", "creatinine_mg_dl": 1.2, "egfr_ml_min_1_73m2": 70},
+    {"timestamp": "2026-01-03T08:00:00Z", "creatinine_mg_dl": 1.5, "egfr_ml_min_1_73m2": 55}
+  ]
+}

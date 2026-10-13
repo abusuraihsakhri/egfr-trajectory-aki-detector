@@ -239,6 +239,8 @@ def build_parser():
     s.add_argument("--bili", type=float); s.add_argument("--creat", type=float); s.add_argument("--inr", type=float); s.add_argument("--na", type=float)
     s.add_argument("--qt", type=float); s.add_argument("--rr", type=float); s.add_argument("--hr", type=float)
     b=sub.add_parser("batch", help="batch csv"); b.add_argument("--input", required=True); b.add_argument("--output", required=True)
+    t=sub.add_parser("trajectory", help="dated renal trajectory from JSON request file")
+    t.add_argument("--input", required=True)
     return p
 
 def main(argv=None):
@@ -258,6 +260,18 @@ def main(argv=None):
             if a.rr is not None: row["rr_ms"]=a.rr
             if a.hr is not None: row["hr_bpm"]=a.hr
         print(assess_row(row))
+        return 0
+    if a.cmd=="trajectory":
+        from renal_trajectory import assess_trajectory
+        with open(a.input, encoding="utf-8") as stream:
+            request = _json.load(stream)
+        if not isinstance(request, dict):
+            p.error("trajectory request must be a JSON object")
+        try:
+            result = assess_trajectory(**request)
+        except (TypeError, ValueError) as exc:
+            p.error(str(exc))
+        print(_json.dumps(result, indent=2))
         return 0
     if a.cmd=="batch":
         res=process_csv(a.input, a.output); print(f"Processed {len(res)} -> {a.output}"); return 0

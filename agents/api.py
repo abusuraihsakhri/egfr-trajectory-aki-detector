@@ -4,9 +4,10 @@ FastAPI REST API Server for Egfr Trajectory Aki Detector.
 from typing import Dict, Any, List
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from .base import AuditLogger, PHIGuard
+from .base import AuditLogger, PHIGuard, SecurityException
 from .models import SystemTaskPayload, ConsensusDossier
 from .supervisor import SystemSupervisor
+from renal_trajectory import assess_trajectory
 
 supervisor = SystemSupervisor(model_provider="mock")
 
@@ -37,7 +38,10 @@ def metrics():
 
 @app.post("/api/audit")
 def api_audit(payload: SystemTaskPayload):
-    dossier = supervisor.process_task(payload)
+    try:
+        dossier = supervisor.process_task(payload)
+    except SecurityException as exc:
+        raise HTTPException(status_code=422, detail="Identifier rejected by input filter") from exc
     return dossier.to_dict()
 
 
@@ -46,10 +50,24 @@ def api_chat(req: ChatRequest):
     try:
         ans = supervisor.query_supervisory_chat(req.query)
         return {"response": ans}
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    except SecurityException as exc:
+        raise HTTPException(status_code=422, detail="Input rejected by identifier filter") from exc
 
 
 @app.get("/api/audit/logs")
 def api_audit_logs():
     return {"audit_trail": AuditLogger.get_trail(), "verified": AuditLogger.verify_integrity()}
+
+
+@app.post("/api/trajectory")
+def api_trajectory(payload: Dict[str, Any]):
+    """KDIGO creatinine/urine-output screening and descriptive eGFR slope."""
+    try:
+        return assess_trajectory(
+            payload.get("observations"),
+            urine_output_ml_kg_h=payload.get("urine_output_ml_kg_h"),
+            urine_duration_hours=payload.get("urine_duration_hours"),
+            renal_replacement_therapy=payload.get("renal_replacement_therapy", False),
+        )
+    except (ValueError, TypeError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
