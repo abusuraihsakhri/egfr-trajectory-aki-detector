@@ -32,16 +32,19 @@ jobs:
         node --check app.js
         node --check ui.js
         node tests/test_browser.js
+        python cli.py trajectory -i sample_renal_trajectory.json > /tmp/renal-result.json
+        python egfr_trajectory.py trajectory --input sample_renal_trajectory.json > /tmp/renal-direct.json
+        python -c 'import json; assert json.load(open("/tmp/renal-result.json"))["aki_stage"] == 1; assert json.load(open("/tmp/renal-direct.json"))["aki_stage"] == 1'
 
     - name: Run Pytest Suite
       run: |
         pytest -v
 
-    - name: Security SAST & Zero-PHI Audit
+    - name: Verify empty audit-chain integrity
       run: |
         python -c "
         from agents.base import PHIGuard, AuditLogger
         import pytest
         assert AuditLogger.verify_integrity() is True
-        print('Security & Zero-PHI Audit Passed!')
+        print('Audit chain empty-state check passed')
         "
