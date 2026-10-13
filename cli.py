@@ -8,6 +8,7 @@ import sys
 from agents.models import SystemTaskPayload
 from agents.supervisor import SystemSupervisor
 from agents.base import AuditLogger
+from renal_trajectory import assess_trajectory
 
 supervisor = SystemSupervisor(model_provider="mock")
 
@@ -34,6 +35,11 @@ def main(argv=None):
     p_batch.add_argument("-i", "--input", required=True)
     p_batch.add_argument("-o", "--output", default="results.csv")
 
+    # Renal trajectory
+    p_trajectory = subparsers.add_parser("trajectory", help="Assess dated creatinine/eGFR JSON observations")
+    p_trajectory.add_argument("-i", "--input", required=True, help="JSON request file")
+    p_trajectory.add_argument("-o", "--output", help="Optional result JSON file")
+
     # Verify Audit
     subparsers.add_parser("verify-audit", help="Verify HMAC audit trail integrity")
 
@@ -43,6 +49,23 @@ def main(argv=None):
     p_serve.add_argument("--port", type=int, default=8000)
 
     args = parser.parse_args(argv)
+
+    if args.command == "trajectory":
+        with open(args.input, encoding="utf-8") as stream:
+            request = json.load(stream)
+        if not isinstance(request, dict):
+            parser.error("trajectory input must be a JSON object")
+        try:
+            outcome = assess_trajectory(**request)
+        except (TypeError, ValueError) as exc:
+            parser.error(str(exc))
+        result_text = json.dumps(outcome, indent=2) + "\\n"
+        if args.output:
+            with open(args.output, "w", encoding="utf-8") as stream:
+                stream.write(result_text)
+        else:
+            print(result_text, end="")
+        return 0
 
     if args.command == "audit":
         payload = SystemTaskPayload(
@@ -98,7 +121,7 @@ def main(argv=None):
                 primary_metric=float(r.get("primary_metric", 15.0)),
                 secondary_metric=float(r.get("secondary_metric", 5.0)),
                 status_descriptor=r.get("status_descriptor", "NOMINAL"),
-                is_critical_flag=bool(r.get("is_critical_flag", False)),
+                is_critical_flag=str(r.get("is_critical_flag", "")).strip().lower() in ("1", "true", "yes"),
             )
             dossier = supervisor.process_task(payload)
             row_dict = dict(r)
