@@ -1,220 +1,95 @@
-# EGFR Trajectory AKI Detector
+# eGFR Trajectory & AKI Detector
 
-> **Domain:** Nephrology & Renal Replacement Protocols
-> **Reference Guidelines & Standards:** KDIGO & KDOQI Clinical Guidelines
+A local-first research/education tool for screening dated serum creatinine changes against **KDIGO 2012 acute kidney injury (AKI) criteria** and describing longitudinal eGFR measurements. The browser tool runs as static HTML/JavaScript; the Python analysis engine uses only the standard library.
 
-<div align="center">
+**Not a validated medical device.** The output is not a diagnosis, cannot rule out AKI, and must not guide treatment without qualified clinical review.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-![Python](https://img.shields.io/badge/Python-3.10%20%7C%203.11%20%7C%203.12-3776AB.svg?logo=python&logoColor=white)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.111-009688.svg?logo=fastapi&logoColor=white)
-![Audit Trail](https://img.shields.io/badge/Audit-HMAC--SHA256_Tamper--Evident-brightgreen.svg)
-![Zero-PHI Guard](https://img.shields.io/badge/Guard-Zero--PHI_Outbound-blue.svg)
-![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg?logo=docker&logoColor=white)
+## Features
 
-</div>
+- **Timed creatinine screening:** rise ≥0.3 mg/dL in 48 hours, ≥1.5× within 7 days, and stage 1–3 thresholds using prior documented results.
+- **Optional urine-output stage:** sustained mL/kg/hour plus duration (or new kidney replacement therapy for AKI); final stage uses the highest supported criterion.
+- **eGFR trajectory:** least-squares slope in mL/min/1.73 m²/year from dated supplied eGFR values. A historical exploratory rapid-decline flag (<−5/year) is only shown with ≥365 days of follow-up; **this is not a KDIGO 2024 diagnostic threshold**.
+- **Browser CSV import, chart, local JSON export:** no API calls, analytics, cookies, persistent storage or third-party scripts in the web application.
+- **Python CLI and FastAPI:** JSON request support, validation, and an independent `POST /api/trajectory` endpoint.
+- The previous generic calculator/worker suite remains available as legacy functionality; its numeric thresholds and mock responders **are not KDIGO AKI algorithms**.
 
----
+## Browser application
 
-## What It Does
+The root `index.html` provides the static application and is packaged for GitHub Pages via `.github/workflows/pages.yml`. A verified live link will be added when Pages deployment and the public URL are confirmed.
 
-eGFR Trajectory & AKI Detector performs KDIGO AKI staging (creatinine and urine output) plus eGFR slope and rapid-decline flagging. The system includes an enterprise multi-agent analytical suite with HMAC-SHA256 audit trails and zero-PHI outbound protection.
+Open `index.html` in a recent desktop or mobile browser; keep `app.js` and `ui.js` in the same directory. Paste de-identified CSV data or select `sample_renal_trajectory.csv`. The analysis uses the **latest timestamp** against preceding documented measurements, not a retrospective scan for past resolved AKI episodes.
 
----
+CSV columns:
 
-## Key Capabilities & Algorithmic Modules
+```csv
+timestamp,creatinine_mg_dl,egfr_ml_min_1_73m2
+2026-01-01T08:00:00Z,1.0,82
+2026-01-02T08:00:00Z,1.2,70
+2026-01-03T08:00:00Z,1.5,55
+```
 
-### Analytical Functions
+Either biomarker value may be empty, but each row requires a timestamp and at least one value. Timezone-less ISO timestamps are treated as UTC; ambiguous duplicate timestamps are rejected. Use dated observations from the same subject only. Do not enter names, MRNs, dates of birth, or other identifiers.
 
-- **`calculate_score()`** — Generic weighted sum of numeric inputs.
-- **`calculate_meld_na()`** — MELD-Na score for liver disease severity (UNOS guidelines).
-- **`calculate_qtc()`** — QTc correction using Bazett's formula.
-- **`calculate_bmi_z()`** — BMI z-score for pediatric populations.
-- **`convert_hba1c()`** — HbA1c to estimated average glucose conversion (ADA formula).
-- **`calculate_apri_fib4()`** — APRI and FIB-4 scores for liver fibrosis assessment.
-- **`assess_row()`** — Routes input rows to the appropriate calculator.
-- **`process_csv()`** — Batch processes CSV files with path validation.
+## Python and API
 
-### Enterprise Agent Suite (`agents/`)
+Requires Python 3.10+.
 
-- **PHI Outbound Guard** — AST and regex inspection blocking SSNs, MRNs, phone numbers, and patient identifiers.
-- **HMAC-SHA256 Audit Trail** — Chained, cryptographically signed logs for every evaluation.
-- **Multi-Agent Workers** — InvariantQC, SafetyEscalation, ProtocolConformance workers with consensus orchestration.
-- **FastAPI REST Server** — OpenAPI 3.1 endpoints with `/health`, `/metrics`, `/api/audit`, `/api/chat`.
-- **Prometheus Telemetry** — Operational metrics exporter.
-- **LLM Integration** — Pluggable adapter for Ollama, Claude, OpenAI, or deterministic mocks.
-
----
-
-## Installation
-
-### Prerequisites
-- Python 3.10 or higher
-- pip
-
-### Setup
 ```bash
-# Clone the repository
-git clone https://github.com/abusuraihsakhri/egfr-trajectory-aki-detector.git
-cd egfr-trajectory-aki-detector
-
-# Create virtual environment (recommended)
 python -m venv .venv
-source .venv/bin/activate  # Linux/macOS
-# or: .venv\Scripts\activate  # Windows
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Or install as a package
-pip install -e .
-```
-
----
-
-## Usage
-
-### Core Calculations (stdlib only)
-```bash
-# Single calculation via CLI
-python egfr_trajectory.py single --json '{"bilirubin": 2.5, "creatinine": 1.2, "inr": 1.1, "sodium": 135}'
-
-# Batch CSV processing
-python egfr_trajectory.py batch --input sample.csv --output results.csv
-```
-
-### Enterprise Agent Suite
-```bash
-# Run single task evaluation
-python cli.py audit --task-id TASK-001 --primary 28.5 --secondary 14.2
-
-# Batch process CSV records
-python cli.py batch -i input.csv -o results.csv
-
-# Verify HMAC audit trail integrity
-python cli.py verify-audit
-
-# Interactive chat with supervisor
-python cli.py chat "Explain specifications"
-
-# Launch FastAPI REST server
+source .venv/bin/activate
+python -m pip install -e '.[dev]'
+python -m pytest -q
+python cli.py trajectory --input sample_renal_trajectory.json
+python egfr_trajectory.py trajectory --input sample_renal_trajectory.json
 python cli.py serve --host 127.0.0.1 --port 8000
 ```
 
-### REST API Endpoints
-
-| Endpoint | Method | Description |
-|:---------|:-------|:------------|
-| `/health` | GET | Service health check |
-| `/metrics` | GET | Prometheus-compatible metrics |
-| `/api/audit` | POST | Submit task for evaluation |
-| `/api/chat` | POST | Chat with supervisor |
-| `/api/audit/logs` | GET | Retrieve audit trail |
-
----
-
-## Security Configuration
-
-### Audit Secret Key
-Set the `AUDIT_SECRET_KEY` environment variable for persistent HMAC audit trail integrity across restarts:
+The API documents its endpoints at `http://127.0.0.1:8000/docs`. Request example:
 
 ```bash
-export AUDIT_SECRET_KEY="your-secure-random-key-min-32-chars"
+curl -s http://127.0.0.1:8000/api/trajectory -H 'Content-Type: application/json' \
+  --data-binary @sample_renal_trajectory.json
 ```
 
-**Warning:** Without this key, an ephemeral key is generated at startup, and audit trail integrity cannot be verified across restarts.
+The trajectory endpoint accepts `observations`, optional `urine_output_ml_kg_h` and `urine_duration_hours` together, and optional boolean `renal_replacement_therapy` (new treatment for AKI only). Invalid values produce HTTP 422. CLI option `--output` writes JSON locally.
 
----
+Legacy endpoints remain: `/health`, `/metrics` (JSON counters), `/api/audit`, `/api/chat`, and `/api/audit/logs`. The generic worker CLI remains `python cli.py audit`; generic calculators and CSV batching remain in `egfr_trajectory.py`. These separate experimental features are not substitutes for the renal trajectory algorithm.
 
-## Testing
+## Interpretation and limits
 
-### Run the full test suite
-```bash
-pytest -v
-```
+- KDIGO serum-creatinine staging requires an **observed temporal increase**. The program does not impute a baseline, infer AKI from eGFR alone, or classify a solitary high creatinine as AKI.
+- AKI may occur without the available tests; urine-output staging is incomplete without a measured sustained rate. False negatives are possible. No pediatric eGFR stage-3 branch or full dialysis-history handling is included.
+- Two dated eGFR results suffice to compute a descriptive slope, but sparse measurements, non-steady-state function, assay variation and regression noise make individual estimates uncertain. CKD diagnosis requires appropriate longitudinal and clinical evidence.
+- KDIGO 2024 emphasizes evaluation of eGFR changes and biological variability; this tool's 5-unit/year indicator is a **historical heuristic**, not KDIGO 2024 guidance.
+- The app is **not clinically validated** on outcome data and has not undergone regulatory review.
 
-### Run specific test modules
-```bash
-pytest tests/test_egfr_trajectory_aki_detector.py -v
-pytest tests/test_enrichment.py -v
-pytest test_egfr_trajectory.py -v
-```
+Guideline sources: [KDIGO 2012 AKI guideline](https://kdigo.org/guidelines/acute-kidney-injury/) and [KDIGO 2024 CKD guideline](https://kdigo.org/guidelines/ckd-evaluation-and-management/).
 
-### High-throughput simulation
-```bash
-python simulator.py 1000
-```
+## Privacy and security
 
----
+The static site never sends records to a server and does not store them between sessions. The optional API is a server-side application: do not send clinical identifiers or identifiable records to a shared instance. The legacy pattern-based identifier checks are limited filters, **not HIPAA de-identification, Safe Harbor certification, or comprehensive PHI detection**.
 
-## Input Data Schema
+The legacy audit trail is **in-memory and nonpersistent**. It HMAC-signs metadata per record and verifies the full HMAC chain, but it cannot prove durability or integrity across process restarts without external persistence. Configure `AUDIT_SECRET_KEY` using a strong random value and rotate any key previously committed to repository history. Never put credentials into tracked files.
 
-### Core Calculator Fields
-
-| Field | Description | Required |
-|:------|:------------|:---------|
-| `id` | Observation identifier | Yes |
-| `value` | Primary measurement value | Yes |
-| `qty` | Quantity or count | Yes |
-
-### Agent Task Fields
-
-| Field | Description | Required |
-|:------|:------------|:---------|
-| `task_id` | Unique task identifier | Yes |
-| `target_identifier` | Entity or specimen key | Yes |
-| `primary_metric` | Primary measurement | Yes |
-| `secondary_metric` | Secondary measurement | No |
-| `status_descriptor` | Status code | No |
-| `is_critical_flag` | Emergency escalation flag | No |
-
----
-
-## Container Deployment
+Docker:
 
 ```bash
-docker build -t egfr-trajectory-aki-detector .
-docker run -p 8000:8000 -e AUDIT_SECRET_KEY="your-key" egfr-trajectory-aki-detector
+export AUDIT_SECRET_KEY="$(openssl rand -hex 32)"
+docker compose up --build
 ```
 
-Using docker-compose:
+## Development and checks
+
 ```bash
-docker-compose up -d
+python -m compileall -q agents cli.py egfr_trajectory.py renal_trajectory.py
+python -m pytest -q
+node --check app.js
+node --check ui.js
+node tests/test_browser.js
 ```
 
----
-
-## Project Structure
-
-```
-egfr-trajectory-aki-detector/
-├── agents/                  # Enterprise agent suite
-│   ├── __init__.py
-│   ├── api.py              # FastAPI REST server
-│   ├── base.py             # PHI guard, HMAC audit trail
-│   ├── learning.py         # Bayesian calibration engine
-│   ├── llm_factory.py      # LLM provider abstraction
-│   ├── metrics.py          # Prometheus metrics exporter
-│   ├── models.py           # Pydantic data models
-│   ├── streamer.py         # WebSocket telemetry
-│   ├── supervisor.py       # Multi-agent orchestrator
-│   └── workers.py          # Specialized worker agents
-├── tests/                   # Test suite
-│   ├── test_egfr_trajectory_aki_detector.py
-│   └── test_enrichment.py
-├── web/                     # Static web assets
-├── cli.py                   # CLI entry point
-├── egfr_trajectory.py       # Core calculation modules
-├── enrichment.py            # Domain enrichment engines
-├── simulator.py             # High-throughput simulator
-├── pyproject.toml           # Package configuration
-├── requirements.txt         # Dependencies
-├── Dockerfile               # Container definition
-└── docker-compose.yml       # Multi-container orchestration
-```
-
----
+GitHub Actions runs the Python suite on 3.10–3.12 and exercises the browser engine with Node.js. The Pages workflow copies only static assets (`index.html`, `app.js`, `ui.js`) into its deployment artifact. No Pyodide or backend service is needed for the browser calculations.
 
 ## License
 
-[MIT](LICENSE)
+MIT; see [LICENSE](LICENSE).
