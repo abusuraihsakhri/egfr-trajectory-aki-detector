@@ -53,7 +53,7 @@ footer{margin-top:24px;padding-top:16px;border-top:1px solid var(--line);font-si
 <div><label for="rate">Urine output (mL/kg/h)</label><input id="rate" type="number" min="0" step="any" placeholder="Optional"></div>
 <div><label for="duration">Sustained duration (hours)</label><input id="duration" type="number" min="0" step="any" placeholder="Optional"></div>
 </div>
-<label class="check" for="rrt"><input id="rrt" type="checkbox"> Kidney replacement therapy initiated</label>
+<label class="check" for="rrt"><input id="rrt" type="checkbox"> New kidney replacement therapy for AKI initiated</label>
 <div class="row">
 <button id="analyze" type="button">Analyze</button>
 <button id="example" class="secondary" type="button">Longitudinal example</button>
@@ -72,7 +72,7 @@ footer{margin-top:24px;padding-top:16px;border-top:1px solid var(--line);font-si
 </div>
 <footer>
 <p>Missing comparator values cannot exclude AKI. A urine-output rate is treated as continuously sustained over the stated duration. eGFR slope during non-steady-state AKI is not evidence of chronic kidney disease progression.</p>
-<p>Based on <a href="https://kdigo.org/guidelines/acute-kidney-injury/" target="_blank" rel="noopener noreferrer">KDIGO 2012 AKI criteria</a>. No data is transmitted or persisted by this web application. <a href="https://github.com/abusuraihsakhri/egfr-trajectory-aki-detector" rel="noopener noreferrer">Source and local Python API</a>.</p>
+<p>The eGFR slope threshold of 5 mL/min/1.73 m²/year is an exploratory historical convention, not a KDIGO 2024 criterion. Based on <a href="https://kdigo.org/guidelines/acute-kidney-injury/" target="_blank" rel="noopener noreferrer">KDIGO 2012 AKI criteria</a>. No data is transmitted or persisted by this web application. <a href="https://github.com/abusuraihsakhri/egfr-trajectory-aki-detector" rel="noopener noreferrer">Source and local Python API</a>.</p>
 </footer>
 </main>
 <script src="./app.js"></script>
