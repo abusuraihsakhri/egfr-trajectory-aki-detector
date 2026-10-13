@@ -1,5 +1,7 @@
 # eGFR Trajectory & AKI Detector
 
+### [Open the Live Application →](https://abusuraihsakhri.github.io/egfr-trajectory-aki-detector/)
+
 A local-first research/education tool for screening dated serum creatinine changes against **KDIGO 2012 acute kidney injury (AKI) criteria** and describing longitudinal eGFR measurements. The browser tool runs as static HTML/JavaScript; the Python analysis engine uses only the standard library.
 
 **Not a validated medical device.** The output is not a diagnosis, cannot rule out AKI, and must not guide treatment without qualified clinical review.
@@ -15,7 +17,7 @@ A local-first research/education tool for screening dated serum creatinine chang
 
 ## Browser application
 
-The root `index.html` provides the static application and is packaged for GitHub Pages via `.github/workflows/pages.yml`. A verified live link will be added when Pages deployment and the public URL are confirmed.
+The root `index.html` provides the static application, deployed to GitHub Pages from `master` by `.github/workflows/pages.yml`. The deployment workflow reported success for the link above.
 
 Open `index.html` in a recent desktop or mobile browser; keep `app.js` and `ui.js` in the same directory. Paste de-identified CSV data or select `sample_renal_trajectory.csv`. The analysis uses the **latest timestamp** against preceding documented measurements, not a retrospective scan for past resolved AKI episodes.
 
