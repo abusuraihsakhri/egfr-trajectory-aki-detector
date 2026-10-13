@@ -59,7 +59,7 @@ def main(argv=None):
             outcome = assess_trajectory(**request)
         except (TypeError, ValueError) as exc:
             parser.error(str(exc))
-        result_text = json.dumps(outcome, indent=2) + "\\n"
+        result_text = json.dumps(outcome, indent=2) + "\n"
         if args.output:
             with open(args.output, "w", encoding="utf-8") as stream:
                 stream.write(result_text)
