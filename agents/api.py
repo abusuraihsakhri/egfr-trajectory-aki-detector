@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from .base import AuditLogger, PHIGuard
 from .models import SystemTaskPayload, ConsensusDossier
 from .supervisor import SystemSupervisor
+from renal_trajectory import assess_trajectory
 
 supervisor = SystemSupervisor(model_provider="mock")
 
@@ -53,3 +54,17 @@ def api_chat(req: ChatRequest):
 @app.get("/api/audit/logs")
 def api_audit_logs():
     return {"audit_trail": AuditLogger.get_trail(), "verified": AuditLogger.verify_integrity()}
+
+
+@app.post("/api/trajectory")
+def api_trajectory(payload: Dict[str, Any]):
+    """KDIGO creatinine/urine-output screening and descriptive eGFR slope."""
+    try:
+        return assess_trajectory(
+            payload.get("observations"),
+            urine_output_ml_kg_h=payload.get("urine_output_ml_kg_h"),
+            urine_duration_hours=payload.get("urine_duration_hours"),
+            renal_replacement_therapy=payload.get("renal_replacement_therapy", False),
+        )
+    except (ValueError, TypeError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
